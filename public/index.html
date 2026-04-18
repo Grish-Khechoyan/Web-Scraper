@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Scraper</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Web Scraper</h1>
+    <p class="subtitle">Enter any public URL to scrape basic page data.</p>
+
+    <form id="scrape-form" class="scrape-form">
+      <input id="url-input" type="url" placeholder="https://example.com" required />
+      <button type="submit">Scrape</button>
+    </form>
+
+    <p id="status" class="status"></p>
+
+    <section id="result" class="result hidden">
+      <h2>Result</h2>
+      <p><strong>URL:</strong> <span id="result-url"></span></p>
+      <p><strong>Title:</strong> <span id="result-title"></span></p>
+      <p><strong>Description:</strong> <span id="result-description"></span></p>
+
+      <h3>Headings</h3>
+      <ul id="headings-list"></ul>
+
+      <h3>Links</h3>
+      <ul id="links-list"></ul>
+
+      <h3>Images</h3>
+      <div id="images-grid" class="images-grid"></div>
+
+      <h3>Download</h3>
+      <div class="download-actions">
+        <button id="download-csv-btn" type="button">CSV</button>
+        <button id="download-pdf-btn" type="button">PDF</button>
+        <button id="download-xlsx-btn" type="button">XLSX</button>
+      </div>
+    </section>
+
+    <section class="history">
+      <div class="history-header">
+        <h2>Saved History</h2>
+        <button id="refresh-history-btn" type="button">Refresh</button>
+      </div>
+      <ul id="history-list"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+all:
+  children:
+    backend:
+      hosts:
+        webscraper-backend:
+          ansible_connection: docker
+          ansible_python_interpreter: /usr/local/bin/python
+    database:
+      hosts:
+        webscraper-db:
+          ansible_connection: docker
