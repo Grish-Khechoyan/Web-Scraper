@@ -33,6 +33,9 @@ dist/
 # Ansible temp
 .ansible/
 
+# Terraform local working directory
+.terraform/
+
 # OS/editor noise
 .DS_Store
 Thumbs.db

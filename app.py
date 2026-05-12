@@ -245,4 +245,23 @@ def spa_fallback(path: str):
 
 if __name__ == "__main__":
     init_db()
+    # Get local IP addresses
+    hostname = socket.gethostname()
+    try:
+        ips = socket.gethostbyname_ex(hostname)[2]
+    except Exception:
+        ips = []
+    local_ips = ["127.0.0.1"] + [ip for ip in ips if ip != "127.0.0.1"]
+    
+    print("\n" + "="*50)
+    print("🌐 Flask Web Scraper is running!")
+    print("="*50)
+    print("Access at:")
+    print("  ➜ http://127.0.0.1:5000  (localhost - this machine only)")
+    for ip in local_ips[1:]:
+        print(f"  ➜ http://{ip}:5000     (network - accessible from other devices)")
+    print("="*50 + "\n")
+    
     app.run(debug=True, host="0.0.0.0", port=5000)
+
+
