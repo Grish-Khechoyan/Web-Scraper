@@ -201,6 +201,26 @@ resource "aws_security_group" "private_instance" {
   }
 }
 
+resource "aws_db_instance" "postgres" {
+  identifier             = "project-genesis-postgres"
+  allocated_storage      = 20
+  storage_type           = "gp2"
+  engine                 = "postgres"
+  engine_version         = "16"
+  instance_class         = "db.t3.micro"
+  db_name                = "webscraper"
+  username               = "webscraper_user"
+  password               = var.db_master_password
+  db_subnet_group_name   = aws_db_subnet_group.project_genesis.name
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  publicly_accessible    = false
+  skip_final_snapshot    = true
+
+  tags = {
+    Name = "project-genesis-postgres"
+  }
+}
+
 resource "aws_iam_role" "ssm" {
   name = "project-genesis-ssm-role"
 
@@ -234,6 +254,41 @@ resource "aws_instance" "web" {
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = true
+  user_data_replace_on_change = true
+
+  user_data = <<-EOF
+              #!/bin/bash
+              set -euxo pipefail
+
+              if command -v dnf >/dev/null 2>&1; then
+                dnf update -y
+                dnf install -y git docker
+                dnf install -y docker-compose-plugin || dnf install -y docker-compose
+              else
+                apt-get update -y
+                apt-get install -y git docker.io docker-compose
+              fi
+
+              systemctl enable --now docker
+
+              cd /opt
+              if [ ! -d Web-Scraper ]; then
+                git clone https://github.com/Grish-Khechoyan/Web-Scraper.git
+              fi
+
+              cd Web-Scraper
+              git pull --ff-only
+
+              cat > .env <<'ENV'
+              DATABASE_URL=postgres://webscraper_user:${urlencode(var.db_master_password)}@${aws_db_instance.postgres.endpoint}/webscraper
+              ENV
+
+              if docker compose version >/dev/null 2>&1; then
+                docker compose up -d
+              else
+                docker-compose up -d
+              fi
+              EOF
 
   tags = {
     Name = "project-genesis-app-ec2"

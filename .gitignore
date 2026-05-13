@@ -35,6 +35,8 @@ dist/
 
 # Terraform local working directory
 .terraform/
+*.tfvars
+*.tfvars.json
 
 # OS/editor noise
 .DS_Store

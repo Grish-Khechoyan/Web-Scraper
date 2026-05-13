@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build:
@@ -7,23 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: webscraper-backend
     ports:
-      - "5000:5000"
+      - "80:5000"
     environment:
-      DATABASE_URL: postgresql://webscraper_user:strong_password@db:5432/webscraper
-    depends_on:
-      - db
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
     restart: unless-stopped
-
-  db:
-    image: postgres:16
-    container_name: webscraper-db
-    environment:
-      POSTGRES_DB: webscraper
-      POSTGRES_USER: webscraper_user
-      POSTGRES_PASSWORD: strong_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
