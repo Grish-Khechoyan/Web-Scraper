@@ -1,16 +1,3 @@
-terraform {
-  backend "s3" {
-    bucket       = "project-genesis-tf-state-vboxuser-98765"
-    key          = "project-genesis/terraform.tfstate"
-    region       = "us-east-1"
-    use_lockfile = true
-  }
-}
-
-provider "aws" {
-  region = "us-east-1"
-}
-
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -30,147 +17,37 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_vpc" "project_genesis" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name = "project-genesis-vpc"
-  }
+locals {
+  db_name                = "webscraper"
+  db_username_param_name = "/project-genesis/db/username"
+  db_password_param_name = "/project-genesis/db/password"
+  selected_azs           = slice(data.aws_availability_zones.available.names, 0, 2)
+  effective_azs          = length(var.availability_zones) > 0 ? var.availability_zones : local.selected_azs
 }
 
-resource "aws_internet_gateway" "project_genesis" {
-  vpc_id = aws_vpc.project_genesis.id
+module "networking" {
+  source = "./modules/networking"
 
-  tags = {
-    Name = "project-genesis-igw"
-  }
-}
-
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.project_genesis.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "us-east-1a"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "project-genesis-public-subnet"
-  }
-}
-
-resource "aws_subnet" "private" {
-  vpc_id                  = aws_vpc.project_genesis.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "us-east-1b"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "project-genesis-private-subnet"
-  }
-}
-
-resource "aws_subnet" "private_db" {
-  vpc_id                  = aws_vpc.project_genesis.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "us-east-1a"
-  map_public_ip_on_launch = false
-
-  tags = {
-    Name = "project-genesis-private-db-subnet"
-  }
-}
-
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.project_genesis.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.project_genesis.id
-  }
-
-  tags = {
-    Name = "project-genesis-public-rt"
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.project_genesis.id
-
-  tags = {
-    Name = "project-genesis-private-rt"
-  }
-}
-
-resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
-}
-
-resource "aws_route_table_association" "private_db" {
-  subnet_id      = aws_subnet.private_db.id
-  route_table_id = aws_route_table.private.id
+  environment          = var.environment
+  vpc_cidr             = var.vpc_cidr
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  availability_zones   = local.effective_azs
 }
 
 resource "aws_db_subnet_group" "project_genesis" {
   name       = "project-genesis-db-subnet-group"
-  subnet_ids = [aws_subnet.private_db.id, aws_subnet.private.id]
+  subnet_ids = module.networking.private_subnet_ids
 
   tags = {
     Name = "project-genesis-db-subnet-group"
   }
 }
 
-resource "aws_security_group" "app_sg" {
-  name        = "project-genesis-app-sg"
-  description = "Allow HTTP and SSH inbound traffic for the app EC2 instance"
-  vpc_id      = aws_vpc.project_genesis.id
-
-  ingress {
-    description = "HTTP from anywhere"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "project-genesis-app-sg"
-  }
-}
-
 resource "aws_security_group" "db_sg" {
   name        = "project-genesis-db-sg"
   description = "Allow PostgreSQL inbound traffic from the app security group"
-  vpc_id      = aws_vpc.project_genesis.id
-
-  ingress {
-    description     = "PostgreSQL from app EC2"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app_sg.id]
-  }
+  vpc_id      = module.networking.vpc_id
 
   egress {
     from_port   = 0
@@ -184,10 +61,69 @@ resource "aws_security_group" "db_sg" {
   }
 }
 
+resource "aws_security_group_rule" "db_from_app" {
+  type                     = "ingress"
+  description              = "PostgreSQL from app EC2"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.db_sg.id
+  source_security_group_id = module.compute.app_security_group_id
+}
+
+resource "aws_db_instance" "postgres" {
+  identifier             = "project-genesis-postgres"
+  allocated_storage      = 20
+  storage_type           = "gp2"
+  engine                 = "postgres"
+  engine_version         = "16"
+  instance_class         = "db.t3.micro"
+  db_name                = local.db_name
+  username               = var.db_username
+  password               = var.db_master_password
+  db_subnet_group_name   = aws_db_subnet_group.project_genesis.name
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  publicly_accessible    = false
+  skip_final_snapshot    = true
+
+  tags = {
+    Name = "project-genesis-postgres"
+  }
+}
+
+resource "aws_ssm_parameter" "db_username" {
+  name  = local.db_username_param_name
+  type  = "String"
+  value = var.db_username
+}
+
+resource "aws_ssm_parameter" "db_password" {
+  name  = local.db_password_param_name
+  type  = "SecureString"
+  value = var.db_master_password
+}
+
+module "compute" {
+  source = "./modules/compute"
+
+  environment                = var.environment
+  vpc_id                     = module.networking.vpc_id
+  subnet_ids                 = module.networking.public_subnet_ids
+  instance_type              = var.instance_type
+  min_size                   = var.min_size
+  max_size                   = var.max_size
+  desired_capacity           = var.desired_capacity
+  db_endpoint                = aws_db_instance.postgres.address
+  db_name                    = local.db_name
+  db_username_parameter_name = aws_ssm_parameter.db_username.name
+  db_password_parameter_name = aws_ssm_parameter.db_password.name
+  ssm_parameter_arns         = [aws_ssm_parameter.db_username.arn, aws_ssm_parameter.db_password.arn]
+}
+
 resource "aws_security_group" "private_instance" {
   name        = "project-genesis-private-instance-sg"
   description = "Allow outbound traffic only for the private EC2 instance"
-  vpc_id      = aws_vpc.project_genesis.id
+  vpc_id      = module.networking.vpc_id
 
   egress {
     from_port   = 0
@@ -198,26 +134,6 @@ resource "aws_security_group" "private_instance" {
 
   tags = {
     Name = "project-genesis-private-instance-sg"
-  }
-}
-
-resource "aws_db_instance" "postgres" {
-  identifier             = "project-genesis-postgres"
-  allocated_storage      = 20
-  storage_type           = "gp2"
-  engine                 = "postgres"
-  engine_version         = "16"
-  instance_class         = "db.t3.micro"
-  db_name                = "webscraper"
-  username               = "webscraper_user"
-  password               = var.db_master_password
-  db_subnet_group_name   = aws_db_subnet_group.project_genesis.name
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
-  publicly_accessible    = false
-  skip_final_snapshot    = true
-
-  tags = {
-    Name = "project-genesis-postgres"
   }
 }
 
@@ -248,57 +164,10 @@ resource "aws_iam_instance_profile" "ssm" {
   role = aws_iam_role.ssm.name
 }
 
-resource "aws_instance" "web" {
-  ami                         = data.aws_ami.amazon_linux.id
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.public.id
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  associate_public_ip_address = true
-  user_data_replace_on_change = true
-
-  user_data = <<-EOF
-              #!/bin/bash
-              set -euxo pipefail
-
-              if command -v dnf >/dev/null 2>&1; then
-                dnf update -y
-                dnf install -y git docker
-                dnf install -y docker-compose-plugin || dnf install -y docker-compose
-              else
-                apt-get update -y
-                apt-get install -y git docker.io docker-compose
-              fi
-
-              systemctl enable --now docker
-
-              cd /opt
-              if [ ! -d Web-Scraper ]; then
-                git clone https://github.com/Grish-Khechoyan/Web-Scraper.git
-              fi
-
-              cd Web-Scraper
-              git pull --ff-only
-
-              cat > .env <<'ENV'
-              DATABASE_URL=postgres://webscraper_user:${urlencode(var.db_master_password)}@${aws_db_instance.postgres.endpoint}/webscraper
-              ENV
-
-              if docker compose version >/dev/null 2>&1; then
-                docker compose up -d
-              else
-                docker-compose up -d
-              fi
-              EOF
-
-  tags = {
-    Name = "project-genesis-app-ec2"
-  }
-}
-
 resource "aws_instance" "private_backend" {
   ami                         = data.aws_ami.amazon_linux.id
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.private.id
+  instance_type               = var.instance_type
+  subnet_id                   = module.networking.private_backend_subnet_id
   vpc_security_group_ids      = [aws_security_group.private_instance.id]
   associate_public_ip_address = false
   iam_instance_profile        = aws_iam_instance_profile.ssm.name
@@ -309,18 +178,10 @@ resource "aws_instance" "private_backend" {
 
   depends_on = [
     aws_iam_role_policy_attachment.ssm,
-    aws_route_table_association.private
+    module.networking
   ]
-}
 
-output "private_backend_instance_id" {
-  value = aws_instance.private_backend.id
-}
-
-output "private_backend_public_ip" {
-  value = aws_instance.private_backend.public_ip
-}
-
-output "private_backend_private_ip" {
-  value = aws_instance.private_backend.private_ip
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }

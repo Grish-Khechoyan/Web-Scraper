@@ -46,3 +46,8 @@ Thumbs.db
 
 # Local tool artifacts
 .codex
+
+
+# POSTRE SQL USERNAME/PASSWORDS
+db_username = "webscraper_user"
+db_password = "CHANGE_ME_use_a_strong_password"
