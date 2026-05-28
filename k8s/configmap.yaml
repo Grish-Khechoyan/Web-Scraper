@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genesis-config
+  namespace: default
+data:
+  DB_HOST: "postgres-service"
+  APP_PORT: "80"
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
