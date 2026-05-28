@@ -26,6 +26,23 @@ spec:
           image: nginx:1.26
           ports:
             - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: genesis-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: genesis-db-creds
+                  key: DB_PASSWORD
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: genesis-db-creds
+                  key: DB_USER
+          volumeMounts:
+            - name: genesis-storage
+              mountPath: /data
           livenessProbe:
             httpGet:
               path: /
@@ -39,3 +56,7 @@ spec:
             limits:
               cpu: "100m"
               memory: "128Mi"
+      volumes:
+        - name: genesis-storage
+          persistentVolumeClaim:
+            claimName: genesis-data-pvc
