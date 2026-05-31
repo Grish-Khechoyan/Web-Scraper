@@ -1,12 +1,13 @@
-{{- if .Values.ingress.enabled }}
-
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-
 metadata:
   name: {{ .Release.Name }}-ingress
-
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx
   rules:
     - host: {{ .Values.ingress.host }}
       http:
@@ -18,6 +19,3 @@ spec:
                 name: {{ .Release.Name }}-service
                 port:
                   number: {{ .Values.service.port }}
-
-{{- end }}
-
