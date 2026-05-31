@@ -35,7 +35,9 @@ dist/
 
 # Terraform local working directory
 .terraform/
+.terraform/*.tfstate
 *.tfstate
+*.tfstate.backup
 *.tfstate.*
 *.tfvars
 *.tfvars.json
@@ -48,4 +50,3 @@ Thumbs.db
 
 # Local tool artifacts
 .codex
-
