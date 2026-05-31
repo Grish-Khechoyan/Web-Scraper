@@ -1,0 +1,11 @@
+replicaCount: 1
+
+image:
+  tag: "latest"
+
+config:
+  APP_ENV: development
+  LOG_LEVEL: debug
+
+ingress:
+  enabled: false
