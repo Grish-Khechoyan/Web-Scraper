@@ -1,35 +1,22 @@
 name: Genesis CI/CD
 
 "on":
-  push:
-    branches: [main, hw30/CI-CD]
-  workflow_dispatch:
+ push:
+   branches: [main]
 
 jobs:
   build-and-push:
     runs-on: self-hosted
-    environment: devopsbotjob
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Login to DockerHub
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
-            echo "Missing DOCKERHUB_USERNAME or DOCKERHUB_TOKEN secret."
-            exit 1
-          fi
-
-          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u devopsbotjob --password-stdin
 
       - name: Build Docker image
-        run: docker build -t "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}" .
+        run: docker build -t devopsbotjob/genesis:${{ github.sha }} .
 
       - name: Push Docker image
         run: |
-          docker push "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}"
-          docker tag "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}" "$DOCKERHUB_USERNAME/genesis:latest"
-          docker push "$DOCKERHUB_USERNAME/genesis:latest"
+          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
+          docker push devopsbotjob/genesis:${{ github.sha }}
