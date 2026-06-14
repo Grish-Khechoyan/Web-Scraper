@@ -1,35 +1,30 @@
 name: Genesis CI/CD
 
-"on":
+on:
   push:
-    branches: [main, hw30/CI-CD]
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
   build-and-push:
     runs-on: self-hosted
-    environment: devopsbotjob
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Login to DockerHub
-        env:
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
-            echo "Missing DOCKERHUB_USERNAME or DOCKERHUB_TOKEN secret."
-            exit 1
-          fi
-
-          printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+        # Make sure DOCKERHUB_TOKEN is exactly named in your GitHub repository secrets!
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u devopsbotjob --password-stdin
 
       - name: Build Docker image
-        run: docker build -t "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}" .
+        run: docker build -t devopsbotjob/genesis:${{ github.sha }} .
 
       - name: Push Docker image
         run: |
-          docker push "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}"
-          docker tag "$DOCKERHUB_USERNAME/genesis:${{ github.sha }}" "$DOCKERHUB_USERNAME/genesis:latest"
-          docker push "$DOCKERHUB_USERNAME/genesis:latest"
+          # 1. Push the specific commit SHA version
+          docker push devopsbotjob/genesis:${{ github.sha }}
+          
+          # 2. Create the latest tag pointing to that image
+          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
+          
+          # 3. CRITICAL: You must explicitly push the latest tag too!
+          docker push devopsbotjob/genesis:latest
