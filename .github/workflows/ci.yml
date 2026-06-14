@@ -1,16 +1,18 @@
 name: Genesis CI/CD
 
-"on":
- push:
-   branches: [main]
+on:
+  push:
+    branches: [main]
 
 jobs:
   build-and-push:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Login to DockerHub
+        # Make sure DOCKERHUB_TOKEN is exactly named in your GitHub repository secrets!
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u devopsbotjob --password-stdin
 
       - name: Build Docker image
@@ -18,5 +20,11 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
+          # 1. Push the specific commit SHA version
           docker push devopsbotjob/genesis:${{ github.sha }}
+          
+          # 2. Create the latest tag pointing to that image
+          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
+          
+          # 3. CRITICAL: You must explicitly push the latest tag too!
+          docker push devopsbotjob/genesis:latest
