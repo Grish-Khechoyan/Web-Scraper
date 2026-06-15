@@ -22,15 +22,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image
-        run: docker build -t devopsbotjob/genesis:${{ github.sha }} .
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }} .
 
       - name: Push Docker image
         run: |
           # 1. Push the specific commit SHA version
-          docker push devopsbotjob/genesis:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }}
           
           # 2. Create the latest tag pointing to that image
-          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
           
           # 3. CRITICAL: You must explicitly push the latest tag too!
-          docker push devopsbotjob/genesis:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
