@@ -10,7 +10,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       # - name: Login to DockerHub
       #   # Make sure DOCKERHUB_TOKEN is exactly named in your GitHub repository secrets!
       #   run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u devopsbotjob --password-stdin
