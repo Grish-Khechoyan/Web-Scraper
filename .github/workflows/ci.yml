@@ -1,30 +1,37 @@
 name: Genesis CI/CD
 
-"on":
+on:
   push:
     branches: [main]
 
 jobs:
   build-and-push:
     runs-on: self-hosted
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: genesis
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Login to DockerHub
-        # Make sure DOCKERHUB_TOKEN is exactly named in your GitHub repository secrets!
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u devopsbotjob --password-stdin
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build Docker image
-        run: docker build -t devopsbotjob/genesis:${{ github.sha }} .
-
-      - name: Push Docker image
+      - name: Ensure ECR repository exists
         run: |
-          # 1. Push the specific commit SHA version
-          docker push devopsbotjob/genesis:${{ github.sha }}
-          
-          # 2. Create the latest tag pointing to that image
-          docker tag devopsbotjob/genesis:${{ github.sha }} devopsbotjob/genesis:latest
-          
-          # 3. CRITICAL: You must explicitly push the latest tag too!
-          docker push devopsbotjob/genesis:latest
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+
+      - name: Login to Amazon ECR
+        run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+      - name: Build and push Docker image to ECR
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }} -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
