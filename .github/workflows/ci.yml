@@ -1,12 +1,17 @@
 name: Genesis CI/CD
 
+<<<<<<< HEAD
 "on":
+=======
+on:
+>>>>>>> hw30/CI-CD
   push:
     branches: [main]
 
 jobs:
   build-and-push:
     runs-on: self-hosted
+<<<<<<< HEAD
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -33,3 +38,33 @@ jobs:
           
           # 3. CRITICAL: You must explicitly push the latest tag too!
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
+=======
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: genesis
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{secrets.AWS_REGION }}.amazonaws.com
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+
+      - name: Login to Amazon ECR
+        run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+      - name: Build and push Docker image to ECR
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }} -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+>>>>>>> hw30/CI-CD
