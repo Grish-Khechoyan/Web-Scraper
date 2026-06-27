@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-config
-  namespace: default
+  namespace: {{ .Release.Namespace }}
 data:
   DB_HOST: {{ .Values.config.dbHost | quote }}
   APP_PORT: {{ .Values.service.port | quote }}

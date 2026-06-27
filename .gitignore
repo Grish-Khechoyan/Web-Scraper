@@ -51,3 +51,9 @@ Thumbs.db
 # Local tool artifacts
 .codex
 actions-runner/
+
+# Kubernetes config and local cluster artifacts
+.kube/
+*.kubeconfig
+kubeconfig
+kubeconfig.*
