@@ -67,6 +67,10 @@ jobs:
 
       - name: Deploy to Minikube
         run: |
+          if ! kubectl cluster-info >/dev/null 2>&1; then
+            echo "Kubernetes cluster is not reachable. Skipping deployment."
+            exit 0
+          fi
           helm upgrade --install genesis ./genesis-chart \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/genesis \
             --set image.tag=${{ needs.build.outputs.tag }}
