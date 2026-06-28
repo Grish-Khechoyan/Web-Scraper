@@ -37,28 +37,15 @@ jobs:
             fi
           fi
 
-  build:
+  delivery:
     needs: test
-    runs-on: self-hosted
-    outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Login to DockerHub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-      - id: meta
-        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Build & push
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7}
+    uses: ./.github/workflows/build-scan.yml
+    with:
+      image: ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }}
+    secrets: inherit
 
   deploy:
-    needs: build
+    needs: delivery
     runs-on: self-hosted
     environment: staging
     steps:
@@ -73,5 +60,5 @@ jobs:
           fi
           helm upgrade --install genesis ./genesis-chart \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/genesis \
-            --set image.tag=${{ needs.build.outputs.tag }}
+            --set image.tag=${{ needs.delivery.outputs.tag }}
           kubectl rollout status deploy/genesis
