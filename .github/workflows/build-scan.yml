@@ -1,0 +1,55 @@
+name: Build and scan Docker image
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "Full Docker image name with tag"
+        required: true
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: self-hosted
+    outputs:
+      image: ${{ steps.full-image.outputs.image }}
+      tag: ${{ steps.extract-tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - id: extract-tag
+        run: |
+          IMAGE="${{ inputs.image }}"
+          echo "tag=${IMAGE##*:}" >> "$GITHUB_OUTPUT"
+
+      - id: full-image
+        run: echo "image=${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        run: docker build -t "${{ steps.full-image.outputs.image }}" .
+
+      - name: Push image
+        run: docker push "${{ steps.full-image.outputs.image }}"
+
+  scan:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build.outputs.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+
+          
