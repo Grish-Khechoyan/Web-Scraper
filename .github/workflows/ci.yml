@@ -50,30 +50,22 @@ jobs:
       image: genesis:${{ github.sha }}
     secrets: inherit
 
+  
+
   deploy:
     needs: delivery
     runs-on: self-hosted
     environment: staging
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Show image information
-        run: |
-          echo "Repository: ${{ needs.delivery.outputs.repository }}"
-          echo "Tag: ${{ needs.delivery.outputs.tag }}"
-
-      - name: Verify Kubernetes connection
-        run: |
-          kubectl cluster-info
+  steps:
+      - uses: actions/checkout@v4
 
       - name: Deploy with Helm
-        run: |
-          helm upgrade --install genesis ./genesis-chart \
-            --set image.repository=${{ needs.delivery.outputs.repository }} \
-            --set image.tag=${{ needs.delivery.outputs.tag }}
+      run: |
+        helm upgrade --install genesis ./genesis-chart \
+          --set image.repository=${{ needs.delivery.outputs.repository }} \
+          --set image.tag=${{ needs.delivery.outputs.tag }}
 
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/genesis
+      - name: Rollout status
+          run: |
+        kubectl rollout status deployment/genesis
