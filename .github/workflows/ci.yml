@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - main
+
   pull_request:
     branches:
       - main
 
 jobs:
+
   test:
     runs-on: self-hosted
 
@@ -43,6 +45,7 @@ jobs:
             fi
           fi
 
+
   delivery:
     needs: test
     uses: ./.github/workflows/build-scan.yml
@@ -50,22 +53,27 @@ jobs:
       image: genesis:${{ github.sha }}
     secrets: inherit
 
-  
 
   deploy:
     needs: delivery
     runs-on: self-hosted
     environment: staging
 
-  steps:
-      - uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show image information
+        run: |
+          echo "Repository: ${{ needs.delivery.outputs.repository }}"
+          echo "Tag: ${{ needs.delivery.outputs.tag }}"
 
       - name: Deploy with Helm
-      run: |
-        helm upgrade --install genesis ./genesis-chart \
-          --set image.repository=${{ needs.delivery.outputs.repository }} \
-          --set image.tag=${{ needs.delivery.outputs.tag }}
+        run: |
+          helm upgrade --install genesis ./genesis-chart \
+            --set image.repository=${{ needs.delivery.outputs.repository }} \
+            --set image.tag=${{ needs.delivery.outputs.tag }}
 
       - name: Rollout status
-          run: |
-        kubectl rollout status deployment/genesis
+        run: |
+          kubectl rollout status deployment/genesis

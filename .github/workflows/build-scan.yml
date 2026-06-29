@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       image:
-        description: Full Docker image name with tag (e.g. genesis:abc123)
+        description: Image name with tag
         required: true
         type: string
     secrets:
@@ -12,15 +12,16 @@ on:
         required: true
       DOCKERHUB_TOKEN:
         required: true
+
     outputs:
       image:
-        description: Full image name
+        description: Full Docker image
         value: ${{ jobs.build.outputs.image }}
       repository:
-        description: Image repository
+        description: Repository
         value: ${{ jobs.build.outputs.repository }}
       tag:
-        description: Image tag
+        description: Tag
         value: ${{ jobs.build.outputs.tag }}
 
 jobs:
@@ -28,57 +29,72 @@ jobs:
     runs-on: self-hosted
 
     outputs:
-      image: ${{ steps.image.outputs.image }}
-      repository: ${{ steps.image.outputs.repository }}
-      tag: ${{ steps.image.outputs.tag }}
+      image: ${{ steps.meta.outputs.image }}
+      repository: ${{ steps.meta.outputs.repository }}
+      tag: ${{ steps.meta.outputs.tag }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to DockerHub
+      - name: Docker login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
             -u "${{ secrets.DOCKERHUB_USERNAME }}" \
             --password-stdin
 
-      - name: Build image metadata
-        id: image
+      - name: Create image name
+        id: meta
         shell: bash
         run: |
           IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}"
+
+          if [ -z "$IMAGE" ]; then
+            echo "ERROR: Image name is empty"
+            exit 1
+          fi
+
+          echo "IMAGE=$IMAGE"
 
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "repository=${IMAGE%:*}" >> "$GITHUB_OUTPUT"
           echo "tag=${IMAGE##*:}" >> "$GITHUB_OUTPUT"
 
-      - name: Debug outputs
-        run: |
-          echo "Image:      ${{ steps.image.outputs.image }}"
-          echo "Repository: ${{ steps.image.outputs.repository }}"
-          echo "Tag:        ${{ steps.image.outputs.tag }}"
-
       - name: Build Docker image
         run: |
-          docker build -t "${{ steps.image.outputs.image }}" .
+          docker build \
+            -t "${{ steps.meta.outputs.image }}" \
+            .
+
+      - name: Verify image exists
+        run: |
+          docker images
+          docker image inspect "${{ steps.meta.outputs.image }}"
 
       - name: Push Docker image
         run: |
-          docker push "${{ steps.image.outputs.image }}"
+          docker push "${{ steps.meta.outputs.image }}"
+
 
   scan:
     needs: build
     runs-on: self-hosted
 
     steps:
-      - name: Debug scan image
+      - name: Verify image variable
         run: |
-          echo "Scanning image: ${{ needs.build.outputs.image }}"
+          echo "Scanning:"
+          echo "${{ needs.build.outputs.image }}"
 
-      - name: Scan image with Trivy
+          if [ -z "${{ needs.build.outputs.image }}" ]; then
+            echo "ERROR: image output is empty"
+            exit 1
+          fi
+
+      - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ needs.build.outputs.image }}
+          image-ref: "${{ needs.build.outputs.image }}"
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "0"
