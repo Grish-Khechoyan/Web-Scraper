@@ -81,8 +81,4 @@ jobs:
           image-ref: ${{ needs.build.outputs.image }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-<<<<<<< HEAD
-          exit-code: '0'
-=======
           exit-code: "0"
->>>>>>> 6479992 (Fix Trivy scan)
