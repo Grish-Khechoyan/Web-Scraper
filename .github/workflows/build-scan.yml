@@ -17,7 +17,6 @@ jobs:
   build:
     runs-on: self-hosted
     outputs:
-      image: ${{ steps.full-image.outputs.image }}
       tag: ${{ steps.extract-tag.outputs.tag }}
     steps:
       - name: Checkout code
@@ -31,14 +30,12 @@ jobs:
           IMAGE="${{ inputs.image }}"
           echo "tag=${IMAGE##*:}" >> "$GITHUB_OUTPUT"
 
-      - id: full-image
-        run: echo "image=${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}" >> "$GITHUB_OUTPUT"
-
+      # Replaced the step output with direct inline usage for cleaner code
       - name: Build image
-        run: docker build -t "${{ steps.full-image.outputs.image }}" .
+        run: docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}" .
 
       - name: Push image
-        run: docker push "${{ steps.full-image.outputs.image }}"
+        run: docker push "${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}"
 
   scan:
     needs: build
@@ -47,9 +44,8 @@ jobs:
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ needs.build.outputs.image }}
+          # Directly referencing the secret and input instead of relying on the build job's output
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '0'
-
-          
